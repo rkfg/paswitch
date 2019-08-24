@@ -3,21 +3,25 @@
 #include <stdio.h>
 #include <string.h>
 
+#define UNUSED(x) (void)(x)
+
 int stop;
 int player_idx = -1;
 int game_idx = -1;
 int secondary_sink_idx = -1;
 int secondary_src_idx = -1;
-char player_sink_name[256];
-char game_source_name[256];
-char secondary_sink_name[256];
-char secondary_src_name[256];
+char* player_sink_name;
+char* game_source_name;
+char* secondary_sink_name;
+char* secondary_src_name;
 int info_cnt = 0;
 int remap_cnt = 0;
 int dump = 0;
 
 void op_success(pa_context* c, int success, void* userdata)
 {
+    UNUSED(c);
+    UNUSED(userdata);
     if (success) {
         remap_cnt++;
     }
@@ -25,6 +29,8 @@ void op_success(pa_context* c, int success, void* userdata)
 
 void sources_list(pa_context* c, const pa_source_info* i, int eol, void* userdata)
 {
+    UNUSED(c);
+    UNUSED(userdata);
     if (eol) {
         info_cnt++;
         return;
@@ -40,6 +46,8 @@ void sources_list(pa_context* c, const pa_source_info* i, int eol, void* userdat
 
 void sinks_list(pa_context* c, const pa_sink_info* i, int eol, void* userdata)
 {
+    UNUSED(c);
+    UNUSED(userdata);
     if (eol) {
         info_cnt++;
         return;
@@ -55,6 +63,8 @@ void sinks_list(pa_context* c, const pa_sink_info* i, int eol, void* userdata)
 
 void sources_output_list(pa_context* c, const pa_source_output_info* i, int eol, void* userdata)
 {
+    UNUSED(c);
+    UNUSED(userdata);
     if (eol) {
         info_cnt++;
         return;
@@ -70,6 +80,8 @@ void sources_output_list(pa_context* c, const pa_source_output_info* i, int eol,
 
 void sinks_input_list(pa_context* c, const pa_sink_input_info* i, int eol, void* userdata)
 {
+    UNUSED(c);
+    UNUSED(userdata);
     if (eol) {
         info_cnt++;
         return;
@@ -85,6 +97,7 @@ void sinks_input_list(pa_context* c, const pa_sink_input_info* i, int eol, void*
 
 void connected(pa_context* c, void* userdata)
 {
+    UNUSED(userdata);
     if (pa_context_get_state(c) != PA_CONTEXT_READY) {
         return;
     }
@@ -97,26 +110,22 @@ void connected(pa_context* c, void* userdata)
 int main(int argc, char* argv[])
 {
     char c;
-    memset(player_sink_name, 0, sizeof(player_sink_name));
-    memset(game_source_name, 0, sizeof(game_source_name));
-    memset(secondary_sink_name, 0, sizeof(secondary_sink_name));
-    memset(secondary_src_name, 0, sizeof(secondary_src_name));
     while ((c = getopt(argc, argv, "i:o:k:c:d")) >= 0) {
         switch (c) {
         case 'i':
-            strncpy(player_sink_name, optarg, sizeof(player_sink_name) - 1);
+            player_sink_name = optarg;
             printf("Sink input: %s\n", player_sink_name);
             break;
         case 'o':
-            strncpy(game_source_name, optarg, sizeof(game_source_name) - 1);
+            game_source_name = optarg;
             printf("Source output: %s\n", game_source_name);
             break;
         case 'k':
-            strncpy(secondary_sink_name, optarg, sizeof(secondary_sink_name) - 1);
+            secondary_sink_name = optarg;
             printf("Target sink: %s\n", secondary_sink_name);
             break;
         case 'c':
-            strncpy(secondary_src_name, optarg, sizeof(secondary_src_name) - 1);
+            secondary_src_name = optarg;
             printf("Target source: %s\n", secondary_src_name);
             break;
         case 'd':
