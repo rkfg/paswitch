@@ -12,7 +12,7 @@ You can find the master sink name using `pacmd list-sinks`. With this sink (name
 paswitch -i 'My Pulse Output' -k secondary -o 'ALSA Capture' -c secondary.monitor
 ```
 
-Here, `My Pulse Output` is the audio player's sink output name (check `pavucontrol` to easily find these names, this one will be on the `Playback` tab), `secondary` is our intermediate sink, `ALSA Capture` is the game's source input name (on the `Recording` tab) and `secondary.monitor` is the intermediate source. If you used the aforementioned `load-module` line the `-k` and `-c` parameters will be the same all the time, all you need is find the sink input and source output names when your player and game are running. Make sure your player has opened the sink (i.e. it's playing or paused, check `pavucontrol`) or else it won't work. After the program connects your player to the game you can turn the mic on in game and play the song.
+Here, `My Pulse Output` is the audio player's sink input name (check `pavucontrol` to easily find these names, this one will be on the `Playback` tab), `secondary` is our intermediate sink, `ALSA Capture` is the game's source output name (on the `Recording` tab) and `secondary.monitor` is the intermediate source. If you used the aforementioned `load-module` line the `-k` and `-c` parameters will be the same all the time, all you need is find the sink input and source output names when your player and game are running. Make sure your player has opened the sink (i.e. it's playing or paused, check `pavucontrol`) or else it won't work. After the program connects your player to the game you can turn the mic on in game and play the song.
 
 To switch it all back and use your actual microphone use:
 ```
@@ -20,5 +20,7 @@ paswitch -i 'My Pulse Output' -k alsa_output.pci-0000_00_1f.3.analog-stereo -o '
 ```
 
 The `-i` and `-o` parameters are the same as in the previous command, these are your player's and game's sink input and source output respectively. The `-k` and `-c` parameters correspond to the hardware sink and source respectively, you can find them using `pacmd list-sinks` and `pacmd list-sources`.
+
+You can also add `-n` parameter to see desktop notifications if the switch was successful or an error happened (requires `libnotify-dev` installed).
 
 Now bind those commands on some hotkeys to easily switch back and forth and entertain other players in the pregame or actual game!
