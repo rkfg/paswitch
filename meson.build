@@ -8,4 +8,12 @@ sources = [
   'paswitch.c',
 ]
 
-exe = executable('paswitch', sources, dependencies : dependency('libpulse'), install : true)
+conf = configuration_data()
+libnotify = dependency('libnotify', required : false)
+if libnotify.found()
+  conf.set('libnotify', true)
+endif
+
+configure_file(input: 'config.h.in', output: 'config.h', configuration : conf)
+
+exe = executable('paswitch', sources, dependencies : [dependency('libpulse'), libnotify], install : true)

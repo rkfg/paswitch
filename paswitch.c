@@ -1,7 +1,17 @@
+#include "config.h"
 #include <getopt.h>
 #include <pulse/pulseaudio.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdarg.h>
+
+#ifdef libnotify
+#include <libnotify/notification.h>
+#include <libnotify/notify.h>
+#define ADDOPTS "n"
+#else
+#define ADDOPTS ""
+#endif
 
 #define UNUSED(x) (void)(x)
 
@@ -10,13 +20,14 @@ int player_idx = -1;
 int game_idx = -1;
 int secondary_sink_idx = -1;
 int secondary_src_idx = -1;
-char* player_sink_name;
-char* game_source_name;
-char* secondary_sink_name;
-char* secondary_src_name;
+char* player_sink_name = NULL;
+char* game_source_name = NULL;
+char* secondary_sink_name = NULL;
+char* secondary_src_name = NULL;
 int info_cnt = 0;
 int remap_cnt = 0;
 int dump = 0;
+int notify = 0;
 
 void op_success(pa_context* c, int success, void* userdata)
 {
@@ -25,6 +36,25 @@ void op_success(pa_context* c, int success, void* userdata)
     if (success) {
         remap_cnt++;
     }
+}
+
+int nprintf(const char* str, ...)
+{
+    int ret;
+    va_list args;
+    va_start(args, str);
+    char buf[1024];
+    ret = vsnprintf(buf, sizeof(buf), str, args);
+    va_end(args);
+#ifdef libnotify
+    if (notify) {
+        NotifyNotification* n = notify_notification_new("PASwitch", buf, NULL);
+        notify_notification_show(n, NULL);
+        g_object_unref(G_OBJECT(n));
+    }
+#endif
+    printf("%s\n", buf);
+    return ret;
 }
 
 void sources_list(pa_context* c, const pa_source_info* i, int eol, void* userdata)
@@ -110,7 +140,7 @@ void connected(pa_context* c, void* userdata)
 int main(int argc, char* argv[])
 {
     char c;
-    while ((c = getopt(argc, argv, "i:o:k:c:d")) >= 0) {
+    while ((c = getopt(argc, argv, "i:o:k:c:dh" ADDOPTS)) >= 0) {
         switch (c) {
         case 'i':
             player_sink_name = optarg;
@@ -131,7 +161,30 @@ int main(int argc, char* argv[])
         case 'd':
             dump = 1;
             break;
+        case 'h':
+            printf("Usage: %s\n"
+                   "  -i\tsink input\n"
+                   "  -o\tsource output\n"
+                   "  -k\ttarget sink\n"
+                   "  -c\ttarget source\n"
+                   "  -d\tdump found sinks, sources, etc.\n"
+#ifdef libnotify
+                   "  -n\tshow desktop notifications\n"
+#endif
+                ,
+                argv[0]);
+            return 0;
+#ifdef libnotify
+        case 'n':
+            notify = 1;
+            notify_init("paswitch");
+            break;
+#endif
         }
+    }
+    if (!player_sink_name || !game_source_name || !secondary_sink_name || !secondary_src_name) {
+        printf("Not all required parameters set.\n");
+        return 2;
     }
     pa_mainloop* ml = pa_mainloop_new();
     pa_context* ctx = pa_context_new(pa_mainloop_get_api(ml), "Pulseaudio switch");
@@ -145,23 +198,46 @@ int main(int argc, char* argv[])
     while (!stop) {
         pa_mainloop_iterate(ml, 1, NULL);
         if (info_cnt == 4) {
+            if (player_idx < 0) {
+                nprintf("Sink input '%s' not found\n", player_sink_name);
+                stop = 1;
+            }
+            if (secondary_sink_idx < 0) {
+                nprintf("Target sink '%s' not found\n", secondary_sink_name);
+                stop = 1;
+            }
+            if (game_idx < 0) {
+                nprintf("Source output '%s' not found\n", game_source_name);
+                stop = 1;
+            }
+            if (secondary_src_idx < 0) {
+                nprintf("Target source '%s' not found\n", secondary_src_name);
+                stop = 1;
+            }
+            if (stop) {
+                break;
+            }
             info_cnt++;
             if (player_idx >= 0 && secondary_sink_idx >= 0) {
                 pa_context_move_sink_input_by_index(ctx, player_idx, secondary_sink_idx, op_success, NULL);
-            } else {
-                remap_cnt++;
             }
             if (game_idx >= 0 && secondary_src_idx >= 0) {
                 pa_context_move_source_output_by_index(ctx, game_idx, secondary_src_idx, op_success, NULL);
-            } else {
-                remap_cnt++;
             }
         }
         if (remap_cnt == 2) {
             stop = 1;
         }
     }
+    if (remap_cnt == 2) {
+        nprintf("Successfully switched\n%s => %s\n%s => %s", player_sink_name, secondary_sink_name, game_source_name, secondary_src_name);
+    }
     pa_mainloop_quit(ml, 0);
     pa_mainloop_free(ml);
+#ifdef libnotify
+    if (notify) {
+        notify_uninit();
+    }
+#endif
     return 0;
 }
