@@ -171,6 +171,7 @@ int main(int argc, char* argv[])
 #ifdef libnotify
                    "  -n\tshow desktop notifications\n"
 #endif
+                   "  -h\tthis help message\n"
                 ,
                 argv[0]);
             return 0;
