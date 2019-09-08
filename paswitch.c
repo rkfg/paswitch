@@ -1,9 +1,9 @@
 #include "config.h"
 #include <getopt.h>
 #include <pulse/pulseaudio.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
-#include <stdarg.h>
 
 #ifdef libnotify
 #include <libnotify/notification.h>
@@ -28,6 +28,7 @@ int info_cnt = 0;
 int remap_cnt = 0;
 int dump = 0;
 int notify = 0;
+int force = 0;
 
 void op_success(pa_context* c, int success, void* userdata)
 {
@@ -36,6 +37,7 @@ void op_success(pa_context* c, int success, void* userdata)
     if (success) {
         remap_cnt++;
     }
+    info_cnt++;
 }
 
 int nprintf(const char* str, ...)
@@ -140,7 +142,7 @@ void connected(pa_context* c, void* userdata)
 int main(int argc, char* argv[])
 {
     char c;
-    while ((c = getopt(argc, argv, "i:o:k:c:dh" ADDOPTS)) >= 0) {
+    while ((c = getopt(argc, argv, "i:o:k:c:dfh" ADDOPTS)) >= 0) {
         switch (c) {
         case 'i':
             player_sink_name = optarg;
@@ -161,6 +163,9 @@ int main(int argc, char* argv[])
         case 'd':
             dump = 1;
             break;
+        case 'f':
+            force = 1;
+            break;
         case 'h':
             printf("Usage: %s\n"
                    "  -i\tsink input\n"
@@ -171,8 +176,8 @@ int main(int argc, char* argv[])
 #ifdef libnotify
                    "  -n\tshow desktop notifications\n"
 #endif
-                   "  -h\tthis help message\n"
-                ,
+                   "  -f\tforce switch even if one pair was not found\n"
+                   "  -h\tthis help message\n",
                 argv[0]);
             return 0;
 #ifdef libnotify
@@ -196,6 +201,7 @@ int main(int argc, char* argv[])
         return 1;
     }
     stop = 0;
+    char partial[256];
     while (!stop) {
         pa_mainloop_iterate(ml, 1, NULL);
         if (info_cnt == 4) {
@@ -215,23 +221,33 @@ int main(int argc, char* argv[])
                 nprintf("Target source '%s' not found\n", secondary_src_name);
                 stop = 1;
             }
-            if (stop) {
+            if (stop && !force) {
                 break;
+            } else {
+                stop = 0;
             }
-            info_cnt++;
             if (player_idx >= 0 && secondary_sink_idx >= 0) {
                 pa_context_move_sink_input_by_index(ctx, player_idx, secondary_sink_idx, op_success, NULL);
+                sprintf(partial, "Partial switch success:\n%s => %s", player_sink_name, secondary_sink_name);
+            } else {
+                info_cnt++;
             }
             if (game_idx >= 0 && secondary_src_idx >= 0) {
                 pa_context_move_source_output_by_index(ctx, game_idx, secondary_src_idx, op_success, NULL);
+                sprintf(partial, "Partial switch success:\n%s => %s", game_source_name, secondary_src_name);
+            } else {
+                info_cnt++;
             }
         }
-        if (remap_cnt == 2) {
+        if (remap_cnt == 2 || info_cnt == 6) {
             stop = 1;
         }
     }
     if (remap_cnt == 2) {
         nprintf("Successfully switched\n%s => %s\n%s => %s", player_sink_name, secondary_sink_name, game_source_name, secondary_src_name);
+    }
+    if (remap_cnt == 1) {
+        nprintf(partial);
     }
     pa_mainloop_quit(ml, 0);
     pa_mainloop_free(ml);
