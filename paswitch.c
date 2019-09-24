@@ -26,6 +26,7 @@ char* secondary_sink_name = NULL;
 char* secondary_src_name = NULL;
 int info_cnt = 0;
 int remap_cnt = 0;
+int expected_remaps = 0;
 int dump = 0;
 int notify = 0;
 int force = 0;
@@ -203,7 +204,9 @@ int main(int argc, char* argv[])
     stop = 0;
     char partial[256];
     while (!stop) {
-        pa_mainloop_iterate(ml, 1, NULL);
+        if (pa_mainloop_iterate(ml, 1, NULL) < 0) {
+            break;
+        }
         if (info_cnt == 4) {
             if (player_idx < 0) {
                 nprintf("Sink input '%s' not found\n", player_sink_name);
@@ -226,20 +229,23 @@ int main(int argc, char* argv[])
             } else {
                 stop = 0;
             }
+            info_cnt++;
             if (player_idx >= 0 && secondary_sink_idx >= 0) {
+                expected_remaps++;
                 pa_context_move_sink_input_by_index(ctx, player_idx, secondary_sink_idx, op_success, NULL);
                 sprintf(partial, "Partial switch success:\n%s => %s", player_sink_name, secondary_sink_name);
             } else {
                 info_cnt++;
             }
             if (game_idx >= 0 && secondary_src_idx >= 0) {
+                expected_remaps++;
                 pa_context_move_source_output_by_index(ctx, game_idx, secondary_src_idx, op_success, NULL);
                 sprintf(partial, "Partial switch success:\n%s => %s", game_source_name, secondary_src_name);
             } else {
                 info_cnt++;
             }
         }
-        if (remap_cnt == 2 || info_cnt == 6) {
+        if (info_cnt == 7 && remap_cnt == expected_remaps) {
             stop = 1;
         }
     }
